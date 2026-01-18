@@ -195,7 +195,7 @@ class MainActivity : ComponentActivity() {
         searchResults.clear()
         
         // Load search URLs in all three WebViews simultaneously
-        val encodedQuery = java.net.URLEncoder.encode(query, Charsets.UTF_8.name())
+        val encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8.toString())
         
         // Swiggy search
         swiggyWebView.loadUrl("https://www.swiggy.com/instamart/search?q=$encodedQuery")

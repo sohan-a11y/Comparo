@@ -94,7 +94,8 @@ class NetworkInterceptor(
             
             // Copy other headers from original request
             originalRequest.requestHeaders?.forEach { (key, value) ->
-                if (key.lowercase() != "cookie" && key.lowercase() != "user-agent") {
+                val lowerKey = key.lowercase()
+                if (lowerKey != "cookie" && lowerKey != "user-agent") {
                     requestBuilder.addHeader(key, value)
                 }
             }
