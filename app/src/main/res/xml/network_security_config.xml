@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext traffic only for platform domains -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">swiggy.com</domain>
+        <domain includeSubdomains="true">zepto.com</domain>
+        <domain includeSubdomains="true">blinkit.com</domain>
+        <domain includeSubdomains="true">grofers.com</domain>
+    </domain-config>
+    
+    <!-- Deny cleartext traffic for all other domains -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
