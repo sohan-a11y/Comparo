@@ -2,6 +2,7 @@ package com.sohan.comparo
 
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.WebSettings
@@ -18,6 +19,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+    
+    companion object {
+        private const val TAG = "Comparo"
+        private const val SEARCH_TIMEOUT_MS = 5000L
+    }
     
     private lateinit var swiggyWebView: WebView
     private lateinit var zeptoWebView: WebView
@@ -38,13 +44,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Enable WebView debugging
-        WebView.setWebContentsDebuggingEnabled(true)
+        // Enable WebView debugging only in debug builds
+        if (BuildConfig.DEBUG) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         
         // Initialize cookie manager
         val cookieManager = CookieManager.getInstance()
         cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(swiggyWebView, true)
         
         // Create headless WebViews
         initializeHeadlessWebViews()
@@ -199,8 +206,8 @@ class MainActivity : ComponentActivity() {
         // Blinkit search
         blinkitWebView.loadUrl("https://www.blinkit.com/search?q=$encodedQuery")
         
-        // Wait for responses (timeout after 5 seconds)
-        delay(5000)
+        // Wait for responses (timeout)
+        delay(SEARCH_TIMEOUT_MS)
         
         isSearching.value = false
     }

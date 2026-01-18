@@ -1,5 +1,6 @@
 package com.sohan.comparo.interceptor
 
+import android.util.Log
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -14,6 +15,10 @@ import java.util.concurrent.TimeUnit
 class NetworkInterceptor(
     private val onApiResponse: (String, String) -> Unit  // (platform, jsonResponse)
 ) : WebViewClient() {
+    
+    companion object {
+        private const val TAG = "NetworkInterceptor"
+    }
     
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -40,7 +45,7 @@ class NetworkInterceptor(
                 try {
                     cloneAndExecuteRequest(view, request, platform)
                 } catch (e: Exception) {
-                    // Silently fail - don't break WebView
+                    Log.e(TAG, "Error cloning request for $platform: ${e.message}", e)
                 }
             }
         }
@@ -105,7 +110,7 @@ class NetworkInterceptor(
                 }
             }
         } catch (e: Exception) {
-            // Silently fail - don't break WebView
+            Log.e(TAG, "Error executing cloned request for $platform: ${e.message}", e)
         }
     }
 }

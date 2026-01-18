@@ -1,2 +1,2 @@
 #!/bin/sh
-exec ./gradle-8.2/bin/gradle "$@"
+exec ./gradle-8.9/bin/gradle "$@"
