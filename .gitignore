@@ -1,0 +1,25 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+*.log
+*.hprof
+/app/build/
+/app/release/
+
+# Gradle wrapper jar (binary file - generate with gradle wrapper command)
+# gradle/wrapper/gradle-wrapper.jar
