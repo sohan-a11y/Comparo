@@ -342,8 +342,9 @@ fun groupProductsByName(products: List<ProductInfo>): List<List<ProductInfo>> {
 
 fun areSimilarNames(name1: String, name2: String): Boolean {
     // Simple similarity check - can be improved with better algorithms
-    val words1 = name1.split(" ").filter { it.length > 2 }
-    val words2 = name2.split(" ").filter { it.length > 2 }
+    val minWordLength = 2  // Minimum word length to consider for matching
+    val words1 = name1.split(" ").filter { it.length > minWordLength }
+    val words2 = name2.split(" ").filter { it.length > minWordLength }
     
     if (words1.isEmpty() || words2.isEmpty()) {
         return name1 == name2

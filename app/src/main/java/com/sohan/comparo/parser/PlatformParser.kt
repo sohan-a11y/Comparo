@@ -15,6 +15,8 @@ data class ProductInfo(
 
 object PlatformParser {
     
+    private val DELIVERY_TIME_REGEX = Regex("(\\d+)")
+    
     fun parseSwiggy(jsonResponse: String): List<ProductInfo> {
         return try {
             val json = JSONObject(jsonResponse)
@@ -182,8 +184,7 @@ object PlatformParser {
             
             // Parse delivery time if it's a string like "10 mins"
             val etaMinutes = estimatedDeliveryTime?.let {
-                val regex = Regex("(\\d+)")
-                regex.find(it)?.value?.toIntOrNull()
+                DELIVERY_TIME_REGEX.find(it)?.value?.toIntOrNull()
             }
             
             ProductInfo(
