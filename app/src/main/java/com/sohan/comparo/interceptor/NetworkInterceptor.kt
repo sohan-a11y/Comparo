@@ -18,12 +18,13 @@ class NetworkInterceptor(
     
     companion object {
         private const val TAG = "NetworkInterceptor"
+        
+        // Share OkHttpClient across all instances
+        private val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
     }
-    
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .build()
     
     override fun shouldInterceptRequest(
         view: WebView?,
