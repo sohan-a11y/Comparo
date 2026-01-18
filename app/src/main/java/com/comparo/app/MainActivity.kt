@@ -28,15 +28,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: PlatformPagerAdapter
 
     private val platforms = arrayOf("Zepto", "Swiggy Instamart", "Blinkit")
-    private val platformUrls = arrayOf(
-        "https://www.zepto.com",
-        "https://www.swiggy.com/instamart",
-        "https://blinkit.com"
-    )
+    private lateinit var platformUrls: Array<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        platformUrls = arrayOf(
+            getString(R.string.platform_zepto),
+            getString(R.string.platform_swiggy),
+            getString(R.string.platform_blinkit)
+        )
 
         initViews()
         setupViewPager()

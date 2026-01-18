@@ -64,7 +64,7 @@ class PlatformFragment : Fragment() {
             displayZoomControls = false
             loadWithOverviewMode = true
             useWideViewPort = true
-            javaScriptCanOpenWindowsAutomatically = true
+            javaScriptCanOpenWindowsAutomatically = false
             mediaPlaybackRequiresUserGesture = false
         }
 
@@ -132,8 +132,8 @@ class PlatformFragment : Fragment() {
         webView.onResume()
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
+    override fun onDestroy() {
         webView.destroy()
+        super.onDestroy()
     }
 }
