@@ -8,6 +8,7 @@ import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.Button
 import android.widget.ProgressBar
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.material.tabs.TabLayout
@@ -40,6 +41,7 @@ class MainActivity : AppCompatActivity() {
         initViews()
         setupViewPager()
         setupListeners()
+        setupBackPressHandler()
     }
 
     private fun initViews() {
@@ -143,11 +145,16 @@ class MainActivity : AppCompatActivity() {
         progressBar.progress = progress
     }
 
-    override fun onBackPressed() {
-        if (getCurrentFragment()?.canGoBack() == true) {
-            getCurrentFragment()?.goBack()
-        } else {
-            super.onBackPressed()
-        }
+    private fun setupBackPressHandler() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (getCurrentFragment()?.canGoBack() == true) {
+                    getCurrentFragment()?.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
     }
 }

@@ -20,3 +20,6 @@ out/
 *.hprof
 /app/build/
 /app/release/
+
+# Gradle wrapper jar (binary file - generate with gradle wrapper command)
+# gradle/wrapper/gradle-wrapper.jar
