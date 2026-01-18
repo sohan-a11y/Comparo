@@ -2,6 +2,32 @@
 
 A complete Android application that compares grocery prices across Swiggy Instamart, Zepto, and Blinkit using headless WebViews to intercept API calls.
 
+## Download
+
+### Latest APK
+You can download the latest compiled APK without needing Android Studio:
+
+**Option 1: From GitHub Actions (Latest Build)**
+1. Go to [Actions tab](https://github.com/sohan-a11y/Comparo/actions)
+2. Click on the latest successful "Build Android APK" workflow run
+3. Scroll down to "Artifacts" section
+4. Download `Comparo-APK-build-XXX`
+5. Extract the ZIP file to get the APK
+
+**Option 2: From Releases (Stable Versions)**
+1. Go to [Releases page](https://github.com/sohan-a11y/Comparo/releases)
+2. Download the latest `Comparo-vX.X.X.apk` file
+
+### Installation
+1. Download the APK file
+2. Enable "Install from Unknown Sources" in your Android settings
+3. Open the APK file and install
+4. Grant necessary permissions when prompted
+
+**Note:** This is a debug APK for testing purposes. You may see a warning about installing apps from unknown sources - this is normal for APKs not downloaded from the Play Store.
+
+---
+
 ## Features
 
 - **Multi-Platform Price Comparison**: Compare prices across Swiggy, Zepto, and Blinkit simultaneously
