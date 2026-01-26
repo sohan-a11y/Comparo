@@ -14,6 +14,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import android.view.ViewGroup
+import com.sohan.comparo.core.ShadowComparisonResult
+import com.sohan.comparo.parser.BankOffer
+import com.sohan.comparo.parser.PlatformParser
 import com.sohan.comparo.parser.ProductInfo
 
 enum class Screen {
@@ -33,7 +36,12 @@ fun ComparoApp(
     searchResults: List<ProductInfo>,
     isSearching: Boolean,
     searchError: String? = null,
-    activeLoginUrl: String? = null,
+    activeLoginUrl: String? = null, // Deprecated
+    activeWebView: android.webkit.WebView? = null,
+    cartItems: List<PlatformParser.CartItem> = emptyList(),
+    bankOffers: List<BankOffer> = emptyList(),
+    shadowResults: List<ShadowComparisonResult> = emptyList(),
+    isShadowSearching: Boolean = false,
     onLoginFinished: () -> Unit = {},
     onLoginDismissed: () -> Unit = {}
 ) {
@@ -48,7 +56,7 @@ fun ComparoApp(
     }
     
     // Handle Back Press when Login is active
-    androidx.activity.compose.BackHandler(enabled = activeLoginUrl != null) {
+    androidx.activity.compose.BackHandler(enabled = activeWebView != null) {
         onLoginDismissed()
     }
     
@@ -70,14 +78,18 @@ fun ComparoApp(
                         onSearch = onSearch,
                         searchResults = searchResults,
                         isSearching = isSearching,
-                        searchError = searchError
+                        searchError = searchError,
+                        cartItems = cartItems,
+                        bankOffers = bankOffers,
+                        shadowResults = shadowResults,
+                        isShadowSearching = isShadowSearching
                     )
                 }
                 
                 // Login Overlay
-                if (activeLoginUrl != null) {
+                if (activeWebView != null) {
                     LoginWebViewContainer(
-                        url = activeLoginUrl,
+                        webView = activeWebView,
                         onDone = onLoginFinished,
                         onDismiss = onLoginDismissed
                     )
@@ -89,7 +101,7 @@ fun ComparoApp(
 
 @Composable
 fun LoginWebViewContainer(
-    url: String,
+    webView: android.webkit.WebView?, // The actual detached WebView
     onDone: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -97,7 +109,7 @@ fun LoginWebViewContainer(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .zIndex(10f) // Ensure it's on top
+            .zIndex(10f)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // Toolbar
@@ -115,7 +127,7 @@ fun LoginWebViewContainer(
                 }
                 
                 Text(
-                    text = "Login",
+                    text = "Login / Solve CAPTCHA",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -125,31 +137,20 @@ fun LoginWebViewContainer(
                 }
             }
             
-            // WebView
-            androidx.compose.ui.viewinterop.AndroidView(
-                factory = { context ->
-                    android.webkit.WebView(context).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            databaseEnabled = true
-                        }
-                        webViewClient = android.webkit.WebViewClient()
-                        loadUrl(url)
-                    }
-                },
-                update = { webView ->
-                    // Avoid reloading on recomposition if URL hasn't changed effectively
-                    if (webView.url != url && webView.originalUrl != url) {
-                        webView.loadUrl(url)
-                    }
-                },
-                modifier = Modifier.weight(1f)
-            )
+            // Container for the detached WebView
+            if (webView != null) {
+                androidx.compose.ui.viewinterop.AndroidView(
+                    factory = {
+                        webView
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                // Fallback / Loading
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
 }
@@ -194,8 +195,8 @@ fun SetupScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = platform.name,
@@ -236,7 +237,11 @@ fun HomeScreen(
     onSearch: (String) -> Unit,
     searchResults: List<ProductInfo>,
     isSearching: Boolean,
-    searchError: String? = null
+    searchError: String? = null,
+    cartItems: List<PlatformParser.CartItem>,
+    bankOffers: List<BankOffer>,
+    shadowResults: List<ShadowComparisonResult>,
+    isShadowSearching: Boolean
 ) {
     var searchQuery by remember { mutableStateOf("") }
     
@@ -281,54 +286,134 @@ fun HomeScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Results
-        if (searchResults.isNotEmpty()) {
+        // --- Bank Offers Section ---
+        if (bankOffers.isNotEmpty()) {
             Text(
-                text = "Comparison Results",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                text = "Detected Offers",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
             )
-            
-            val groupedProducts = groupProductsByName(searchResults)
-            
-            LazyColumn {
-                items(groupedProducts) { group ->
-                    ProductComparisonGroup(products = group)
-                    Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.foundation.lazy.LazyRow {
+                items(bankOffers) { offer ->
+                    Card(
+                        modifier = Modifier
+                            .padding(end = 8.dp, bottom = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD))
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(offer.bankName, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelMedium)
+                            Text(offer.discountDescription ?: "Offer", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                 }
             }
-        } else if (searchError != null && !isSearching) {
-            // Error State
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+
+        // --- Cart Comparison Section ---
+        if (cartItems.isNotEmpty()) {
+             Text(
+                text = "Live Cart Comparison (${cartItems[0].platform})",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            if (isShadowSearching) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Text("Checking other apps...", style = MaterialTheme.typography.bodySmall)
+            }
+            
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(shadowResults) { result ->
+                     ShadowResultCard(result)
+                     Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+            
+        } else {
+            // Normal Search Results
+            if (searchResults.isNotEmpty()) {
+                Text(
+                    text = "Comparison Results",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                val groupedProducts = groupProductsByName(searchResults)
+                
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(groupedProducts) { group ->
+                        ProductComparisonGroup(products = group)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            } else if (searchError != null && !isSearching) {
+                // Error State
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("⚠️", fontSize = 48.sp)
+                        Text(searchError, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            } else if (!isSearching) {
+                Box(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = "⚠️",
-                        fontSize = 48.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = searchError,
+                        text = "Add items to your Swiggy/Zepto cart to compare automatically!",
                         style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.error,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
             }
-        } else if (!isSearching) {
-            // Empty / Initial State
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
+        }
+    }
+}
+
+@Composable
+fun ShadowResultCard(result: ShadowComparisonResult) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (result.isCheaper) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "Search for products to compare prices",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(result.originalItem.name, fontWeight = FontWeight.Bold)
+                if (result.isCheaper) {
+                    Text("Save ₹${String.format("%.0f", result.savingsAmount)}", color = Color(0xFF2E7D32), fontWeight = FontWeight.Bold)
+                }
+            }
+            
+            Divider(modifier = Modifier.padding(vertical = 8.dp))
+            
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Column {
+                    Text(result.originalItem.platform, style = MaterialTheme.typography.bodySmall)
+                    Text("₹${result.originalItem.unitPrice}", fontWeight = FontWeight.Medium)
+                }
+                
+                if (result.bestAlternative != null) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(result.bestAlternative.platform, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        Text("₹${result.bestAlternative.price}", fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                    }
+                } else {
+                     Text("No better deal", style = MaterialTheme.typography.bodySmall, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                }
             }
         }
     }

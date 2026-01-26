@@ -208,8 +208,106 @@ object PlatformParser {
                 imageUrl = imageUrl,
                 originalPrice = if (mrp > price) mrp else null
             )
+            ProductInfo(
+                name = name,
+                price = price,
+                etaMinutes = etaMinutes,
+                platform = "Blinkit",
+                inStock = true,
+                imageUrl = imageUrl,
+                originalPrice = if (mrp > price) mrp else null
+            )
         } catch (e: Exception) {
             null
         }
     }
-}
+
+    // --- Cart Parsing ---
+    
+    data class CartItem(
+        val name: String,
+        val quantity: Int,
+        val unitPrice: Double,
+        val totalPrice: Double,
+        val platform: String
+    )
+    
+    fun parseSwiggyCart(jsonResponse: String): List<CartItem> {
+        return try {
+            val json = JSONObject(jsonResponse)
+            val items = mutableListOf<CartItem>()
+            
+            // Common path: data.cart_items or data.cart.items
+            val data = json.optJSONObject("data") ?: return emptyList()
+            
+            // Path 1: data.cart.items
+            val cart = data.optJSONObject("cart")
+            val cartItems = cart?.optJSONArray("items") ?: data.optJSONArray("cart_items")
+            
+            if (cartItems != null) {
+                for (i in 0 until cartItems.length()) {
+                    val item = cartItems.getJSONObject(i)
+                    val name = item.optString("name", "Unknown Item")
+                    val qty = item.optInt("quantity", 1)
+                    val price = item.optDouble("price", 0.0) / 100 // Swiggy often uses paise
+                    val total = item.optDouble("item_total", 0.0) / 100
+                    
+                    items.add(CartItem(name, qty, price, total, "Swiggy"))
+                }
+            }
+            items
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun parseZeptoCart(jsonResponse: String): List<CartItem> {
+        return try {
+            val json = JSONObject(jsonResponse)
+            val items = mutableListOf<CartItem>()
+            
+            // Path: store_cart.items
+            val storeCart = json.optJSONObject("store_cart") ?: json.optJSONObject("cart")
+            val cartItems = storeCart?.optJSONArray("items")
+            
+            if (cartItems != null) {
+                for (i in 0 until cartItems.length()) {
+                    val item = cartItems.getJSONObject(i)
+                    val product = item.optJSONObject("product")
+                    val name = product?.optString("name") ?: item.optString("name", "Unknown")
+                    val qty = item.optInt("quantity", 1)
+                    val price = product?.optDouble("selling_price", 0.0) ?: item.optDouble("price", 0.0) / 100
+                    
+                    items.add(CartItem(name, qty, price, price * qty, "Zepto"))
+                }
+            }
+            items
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    fun parseBlinkitCart(jsonResponse: String): List<CartItem> {
+        return try {
+            val json = JSONObject(jsonResponse)
+            val items = mutableListOf<CartItem>()
+            
+            // Path: cart.items
+            val cart = json.optJSONObject("cart") ?: json
+            val cartItems = cart.optJSONArray("items")
+            
+            if (cartItems != null) {
+                for (i in 0 until cartItems.length()) {
+                    val item = cartItems.getJSONObject(i)
+                    val name = item.optString("name", "Unknown")
+                    val qty = item.optInt("quantity", 1)
+                    val price = item.optDouble("price", 0.0) / 100
+                    
+                    items.add(CartItem(name, qty, price, price * qty, "Blinkit"))
+                }
+            }
+            items
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
