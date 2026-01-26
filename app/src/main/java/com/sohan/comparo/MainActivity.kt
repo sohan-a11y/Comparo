@@ -275,6 +275,8 @@ class MainActivity : ComponentActivity() {
 
     private fun startLogin(platform: String) {
         activeLoginPlatform.value = platform
+        // Load the login page specifically
+        headlessManager.loadLoginPage(platform)
         // Detach WebView from manager and put into state
         activeWebView.value = headlessManager.getWebViewForUi(platform)
     }

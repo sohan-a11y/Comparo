@@ -167,11 +167,29 @@ class HeadlessBrowserManager(
         webView.settings.blockNetworkImage = true
     }
 
+    fun loadLoginPage(platform: String) {
+        val webView = webViews[platform] ?: return
+        val url = getLoginUrl(platform)
+        if (url.isNotEmpty()) {
+            Log.d(TAG, "Loading login page for $platform: $url")
+            webView.loadUrl(url)
+        }
+    }
+
     private fun getSearchUrl(platform: String, query: String): String {
         return when (platform) {
             "Swiggy" -> "https://www.swiggy.com/instamart/search?q=$query"
             "Zepto" -> "https://www.zepto.com/search?query=$query"
-            "Blinkit" -> "https://www.blinkit.com/search?q=$query"
+            "Blinkit" -> "https://blinkit.com/search?q=$query"
+            else -> ""
+        }
+    }
+
+    private fun getLoginUrl(platform: String): String {
+        return when (platform) {
+            "Swiggy" -> "https://www.swiggy.com/login" // Swiggy specific login page
+            "Zepto" -> "https://www.zepto.com"         // Zepto usually has login on home/sidebar
+            "Blinkit" -> "https://blinkit.com/login"   // Blinkit specific login page
             else -> ""
         }
     }
