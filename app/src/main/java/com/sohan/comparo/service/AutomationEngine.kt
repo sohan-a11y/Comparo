@@ -55,6 +55,27 @@ class AutomationEngine(private val service: ComparoAccessibilityService) {
         return node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
     }
     
+    fun findNodeByClass(root: AccessibilityNodeInfo?, className: String): AccessibilityNodeInfo? {
+        root ?: return null
+        
+        // Simple BFS/DFS traversal to find first node with className
+        // Since findAccessibilityNodeInfosByViewId doesn't work for class, we traverse manually
+        val queue = java.util.ArrayDeque<AccessibilityNodeInfo>()
+        queue.add(root)
+        
+        while (!queue.isEmpty()) {
+            val node = queue.poll() ?: continue
+            if (node.className?.toString() == className || node.className?.toString()?.endsWith(className) == true) {
+                return node
+            }
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i)
+                if (child != null) queue.add(child)
+            }
+        }
+        return null
+    }
+
     // Attempt to find the "Search" bar/button
     fun findSearchButton(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
         root ?: return null
