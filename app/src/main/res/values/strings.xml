@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Comparo</string>
+    <string name="accessibility_service_description">Comparo uses this service to read prices from Swiggy, Zepto, and Blinkit to help you compare prices automatically.</string>
 </resources>

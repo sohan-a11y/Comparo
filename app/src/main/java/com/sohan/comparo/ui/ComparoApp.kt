@@ -31,34 +31,18 @@ data class PlatformLoginState(
 
 @Composable
 fun ComparoApp(
-    onPlatformLogin: (String) -> Unit,
-    onSearch: (String) -> Unit,
-    platformStates: List<PlatformLoginState>,
-    searchResults: List<ProductInfo>,
-    isSearching: Boolean,
-    searchError: String? = null,
-    activeLoginUrl: String? = null, // Deprecated
-    activeWebView: android.webkit.WebView? = null,
-    cartItems: List<PlatformParser.CartItem> = emptyList(),
-    bankOffers: List<BankOffer> = emptyList(),
-    shadowResults: List<ShadowComparisonResult> = emptyList(),
-    isShadowSearching: Boolean = false,
-    onLoginFinished: () -> Unit = {},
-    onLoginDismissed: () -> Unit = {}
+    onPermissionGrant: (PermissionType) -> Unit,
+    isOverlayGranted: Boolean,
+    isAccessibilityGranted: Boolean,
+    onStartService: () -> Unit
 ) {
     var currentScreen by remember { mutableStateOf(Screen.SETUP) }
-    val allLoggedIn = platformStates.all { it.isLoggedIn }
     
-    // Switch to home screen when all platforms are logged in
-    LaunchedEffect(allLoggedIn) {
-        if (allLoggedIn && currentScreen == Screen.SETUP) {
-            currentScreen = Screen.HOME
+    // Auto-advance if permissions granted
+    LaunchedEffect(isOverlayGranted, isAccessibilityGranted) {
+        if (isOverlayGranted && isAccessibilityGranted) {
+            // We can perhaps move to HOME or just stay on Setup with a "Start" button
         }
-    }
-    
-    // Handle Back Press when Login is active
-    androidx.activity.compose.BackHandler(enabled = activeWebView != null) {
-        onLoginDismissed()
     }
     
     ComparoTheme {
@@ -66,34 +50,18 @@ fun ComparoApp(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                // Main Content
-                when (currentScreen) {
-                    Screen.SETUP -> SetupScreen(
-                        platformStates = platformStates,
-                        onPlatformLogin = onPlatformLogin,
-                        onContinue = { currentScreen = Screen.HOME },
-                        canContinue = allLoggedIn
-                    )
-                    Screen.HOME -> HomeScreen(
-                        onSearch = onSearch,
-                        searchResults = searchResults,
-                        isSearching = isSearching,
-                        searchError = searchError,
-                        cartItems = cartItems,
-                        bankOffers = bankOffers,
-                        shadowResults = shadowResults,
-                        isShadowSearching = isShadowSearching
-                    )
-                }
-                
-                // Login Overlay
-                if (activeWebView != null) {
-                    LoginWebViewContainer(
-                        webView = activeWebView,
-                        onDone = onLoginFinished,
-                        onDismiss = onLoginDismissed
-                    )
+            when (currentScreen) {
+                Screen.SETUP -> SetupScreen(
+                    onPermissionGrant = onPermissionGrant,
+                    onContinue = {
+                        onStartService()
+                        currentScreen = Screen.HOME
+                    },
+                    isOverlayGranted = isOverlayGranted,
+                    isAccessibilityGranted = isAccessibilityGranted
+                )
+                Screen.HOME -> Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text("Service is running! Open Swiggy/Zepto/Blinkit to compare.")
                 }
             }
         }
@@ -159,10 +127,10 @@ fun LoginWebViewContainer(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SetupScreen(
-    platformStates: List<PlatformLoginState>,
-    onPlatformLogin: (String) -> Unit,
+    onPermissionGrant: (PermissionType) -> Unit,
     onContinue: () -> Unit,
-    canContinue: Boolean
+    isOverlayGranted: Boolean,
+    isAccessibilityGranted: Boolean
 ) {
     Column(
         modifier = Modifier
@@ -172,64 +140,86 @@ fun SetupScreen(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "Welcome to Comparo",
+            text = "Comparo Setup",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(bottom = 32.dp)
         )
-        
-        Text(
-            text = "Please login to all platforms to continue",
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(bottom = 32.dp)
+
+        PermissionCard(
+            title = "1. Enable Overlay",
+            description = "Required to show price comparison on top of other apps.",
+            isGranted = isOverlayGranted,
+            onClick = { onPermissionGrant(PermissionType.OVERLAY) }
         )
-        
-        // Platform login list
-        platformStates.forEach { platform ->
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = platform.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
-                    if (platform.isLoggedIn) {
-                        Text(
-                            text = "✓",
-                            fontSize = 24.sp,
-                            color = Color(0xFF4CAF50)
-                        )
-                    } else {
-                        Button(onClick = { onPlatformLogin(platform.name) }) {
-                            Text("Login")
-                        }
-                    }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PermissionCard(
+            title = "2. Enable Accessibility",
+            description = "Required to read prices from Swiggy, Zepto, and Blinkit.",
+            isGranted = isAccessibilityGranted,
+            onClick = { onPermissionGrant(PermissionType.ACCESSIBILITY) }
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onContinue,
+            enabled = isOverlayGranted && isAccessibilityGranted,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Start Auto-Comparison")
+        }
+    }
+}
+
+@Composable
+fun PermissionCard(
+    title: String,
+    description: String,
+    isGranted: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            if (isGranted) {
+                Text(
+                    text = "✅",
+                    fontSize = 24.sp
+                )
+            } else {
+                Button(onClick = onClick) {
+                    Text("Enable")
                 }
             }
         }
-        
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        Button(
-            onClick = onContinue,
-            enabled = canContinue,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Continue to Search")
-        }
     }
+}
+
+enum class PermissionType {
+    OVERLAY, ACCESSIBILITY
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
