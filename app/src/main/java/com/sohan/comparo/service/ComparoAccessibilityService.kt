@@ -7,6 +7,7 @@ import com.sohan.comparo.data.ComparisonRepository
 import com.sohan.comparo.data.ScannedItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 
 class ComparoAccessibilityService : AccessibilityService() {
 
@@ -20,6 +21,20 @@ class ComparoAccessibilityService : AccessibilityService() {
     
     private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
 
+    private enum class AutomationState {
+        IDLE,
+        READING_SOURCE,
+        NAVIGATING_TO_COMPETITOR,
+        SEARCHING_PRODUCT,
+        TYPING_PRODUCT,
+        READING_COMPETITOR_PRICE,
+        FINISHED
+    }
+
+    private var currentState = AutomationState.IDLE
+    private var sourceProduct: String = ""
+    private var currentCompetitorPkg: String = ""
+
     override fun onServiceConnected() {
         super.onServiceConnected()
         Log.d(TAG, "Comparo Accessibility Service Connected")
@@ -32,38 +47,6 @@ class ComparoAccessibilityService : AccessibilityService() {
         super.onDestroy()
         serviceScope.cancel()
     }
-
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        event ?: return
-        
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val packageName = event.packageName?.toString() ?: return
-            
-            if (isTargetApp(packageName)) {
-                Log.d(TAG, "Target app detected: $packageName")
-                overlayManager.showOverlay {
-                    // On Compare Clicked
-                    Log.d(TAG, "Compare clicked! Starting automation...")
-                    // Example: Launch Zepto
-                    navigationController.launchApp(NavigationController.PKG_ZEPTO)
-                    // We will need to wait for app load before automating search...
-                }
-            }
-        }
-        
-    private enum class AutomationState {
-        IDLE,
-        READING_SOURCE, // Reading "Milk" from Swiggy
-        NAVIGATING_TO_COMPETITOR, // Opening Zepto
-        SEARCHING_PRODUCT, // Clicking Search in Zepto
-        TYPING_PRODUCT, // Typing "Milk"
-        READING_COMPETITOR_PRICE, // Reading Zepto Price
-        FINISHED
-    }
-
-    private var currentState = AutomationState.IDLE
-    private var sourceProduct: String = ""
-    private var currentCompetitorPkg: String = ""
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
@@ -86,9 +69,13 @@ class ComparoAccessibilityService : AccessibilityService() {
             }
             
             if (isTargetApp(packageName)) {
-               // Show overlay if not already (or update it)
-               // overlayManager.showOverlay { ... } 
-               // (Handled by manual trigger currently)
+                Log.d(TAG, "Target app detected: $packageName")
+                overlayManager.showOverlay {
+                    // On Compare Clicked
+                    Log.d(TAG, "Compare clicked! Starting automation...")
+                    // Example: Launch Zepto
+                    startAutomation("Milk") // Hardcoded product for MVP demo
+                }
             }
         }
         
@@ -106,13 +93,18 @@ class ComparoAccessibilityService : AccessibilityService() {
                  // Push to UI
                  overlayManager.updateItems(ComparisonRepository.scannedItems.value)
              }
+             
+             // AI Parse (Optional)
+             if (com.sohan.comparo.network.GroqApiClient.apiKey.isNotEmpty()) {
+                // serviceScope.launch { ... } // Re-enable if needed
+             }
         }
     }
     
     private fun startAutomation(product: String) {
         currentState = AutomationState.NAVIGATING_TO_COMPETITOR
         sourceProduct = product
-        currentCompetitorPkg = NavigationController.PKG_ZEPTO // Hardcoded for Demo
+        currentCompetitorPkg = NavigationController.PKG_ZEPTO
         
         ComparisonRepository.setStatus("Switching to Zepto...")
         navigationController.launchApp(currentCompetitorPkg)
@@ -129,21 +121,19 @@ class ComparoAccessibilityService : AccessibilityService() {
             
             delay(2000) // Wait for Search Bar to open
             
-            // Find Edit Text
+            // Find Edit Text (re-fetch root)
             val root2 = rootInActiveWindow
             val editNode = automationEngine.findNodeByClass(root2, "android.widget.EditText")
             if (editNode != null) {
                 ComparisonRepository.setStatus("Typing '$sourceProduct'...")
                 automationEngine.typeText(editNode, sourceProduct)
-                // Need to press Enter? 
             } else {
                 Log.e(TAG, "Could not find Search Bar EditText")
             }
             
         } else {
             Log.e(TAG, "Could not find Search Button")
-            ComparisonRepository.setStatus("Search button not found. Using AI fallback...")
-            // AI Fallback logic would go here
+            ComparisonRepository.setStatus("Search button not found")
         }
     }
 

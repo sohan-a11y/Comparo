@@ -18,7 +18,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.sohan.comparo.ui.OverlayContent
 
-class OverlayManager(private val context: Context) : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
+class OverlayManager(private val context: Context) : androidx.lifecycle.LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private var overlayView: ComposeView? = null
@@ -26,19 +26,17 @@ class OverlayManager(private val context: Context) : LifecycleOwner, SavedStateR
     // Lifecycle components needed for Compose
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
-    private val viewModelStore = ViewModelStore()
+    private val _viewModelStore = ViewModelStore() // Backing field
 
     private val _overlayText = androidx.compose.runtime.mutableStateOf("Scanning...")
     private val _scannedItemsState = androidx.compose.runtime.mutableStateOf<List<com.sohan.comparo.data.ScannedItem>>(emptyList())
 
-    // We need to observe the repository flow. Since this is not a Composable, we launch a collector job.
-    // In a real app we'd use a proper View-Model or Service-Scope binding.
-    // For this MVP, we will rely on the Service pushing updates or simple polling, 
-    // OR we trigger a refresh when data changes.
-    // Better: let the Service update us.
-    
     fun updateItems(items: List<com.sohan.comparo.data.ScannedItem>) {
         _scannedItemsState.value = items
+    }
+    
+    fun updateData(data: String) {
+        _overlayText.value = data
     }
 
     fun showOverlay(onCompareTrigger: () -> Unit) {
@@ -91,20 +89,13 @@ class OverlayManager(private val context: Context) : LifecycleOwner, SavedStateR
              overlayView = null
         }
     }
-    
-    fun updateData(data: String) {
-        _overlayText.value = data
-    }
 
-    // LifestyleOwner implementation
+    // LifecycleOwner implementation
     override val lifecycle: Lifecycle get() = lifecycleRegistry
 
     // SavedStateRegistryOwner implementation
     override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
-    // ViewModelStoreOwner implementation
-    override val viewModelStore: ViewModelStore get() = viewModelStore
+    // ViewModelStoreOwner implementation - Must be public and override
+    override val viewModelStore: ViewModelStore get() = _viewModelStore
 }
-
-// Interface to fix LifecycleOwner generic constraint issue if any
-interface LifecycleOwner : androidx.lifecycle.LifecycleOwner
