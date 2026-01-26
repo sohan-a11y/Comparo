@@ -30,7 +30,7 @@ class OverlayManager(private val context: Context) : LifecycleOwner, SavedStateR
 
     private val _overlayText = androidx.compose.runtime.mutableStateOf("Scanning...")
 
-    fun showOverlay() {
+    fun showOverlay(onCompareTrigger: () -> Unit) {
         if (overlayView != null) return // Already showing
 
         lifecycleRegistry.currentState = Lifecycle.State.CREATED
@@ -59,7 +59,10 @@ class OverlayManager(private val context: Context) : LifecycleOwner, SavedStateR
             setViewTreeSavedStateRegistryOwner(this@OverlayManager)
             
             setContent {
-                OverlayContent(textState = _overlayText)
+                OverlayContent(
+                    textState = _overlayText,
+                    onCompareClick = onCompareTrigger
+                )
             }
         }
         

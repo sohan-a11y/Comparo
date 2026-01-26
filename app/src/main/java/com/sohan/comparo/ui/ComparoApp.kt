@@ -57,6 +57,10 @@ fun ComparoApp(
                         onStartService()
                         currentScreen = Screen.HOME
                     },
+                    onSaveApiKey = { key -> 
+                        com.sohan.comparo.network.GroqApiClient.apiKey = key 
+                        com.sohan.comparo.network.GroqApiClient.resetClient()
+                    },
                     isOverlayGranted = isOverlayGranted,
                     isAccessibilityGranted = isAccessibilityGranted
                 )
@@ -129,6 +133,7 @@ fun LoginWebViewContainer(
 fun SetupScreen(
     onPermissionGrant: (PermissionType) -> Unit,
     onContinue: () -> Unit,
+    onSaveApiKey: (String) -> Unit,
     isOverlayGranted: Boolean,
     isAccessibilityGranted: Boolean
 ) {
@@ -161,6 +166,54 @@ fun SetupScreen(
             isGranted = isAccessibilityGranted,
             onClick = { onPermissionGrant(PermissionType.ACCESSIBILITY) }
         )
+        
+        Spacer(modifier = Modifier.height(16.dp))
+        
+        // AI Key Section
+        var apiKey by remember { mutableStateOf("") }
+        var isKeySaved by remember { mutableStateOf(false) }
+        
+        Card(
+             modifier = Modifier.fillMaxWidth(),
+             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "3. Groq API Key (Optional)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "For smarter AI-based price detection.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                if (isKeySaved) {
+                     Text("✅ Key Saved", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                } else {
+                    OutlinedTextField(
+                        value = apiKey,
+                        onValueChange = { apiKey = it },
+                        label = { Text("Enter API Key") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Button(
+                        onClick = { 
+                            onSaveApiKey(apiKey) 
+                            isKeySaved = true
+                        },
+                        enabled = apiKey.isNotEmpty(),
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text("Save")
+                    }
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 

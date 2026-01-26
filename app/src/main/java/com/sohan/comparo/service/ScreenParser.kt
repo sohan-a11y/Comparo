@@ -49,6 +49,49 @@ object ScreenParser {
 
     data class ParsedData(
         val allText: List<String>,
-        val detectedTotal: Double
+        val detectedTotal: Double,
+        val isAiResult: Boolean = false
     )
+
+    suspend fun parseWithAi(textNodes: List<String>, currentTotal: Double): ParsedData {
+        val service = com.sohan.comparo.network.GroqApiClient.getService() ?: return ParsedData(textNodes, currentTotal)
+        
+        val prompt = """
+            Analyze this screen text from a shopping app (Swiggy/Zepto/Blinkit). 
+            Extract the 'Cart Total' or 'To Pay' amount.
+            Also list the items in the cart if visible.
+            
+            Screen Text:
+            ${textNodes.joinToString("\n")}
+            
+            Return ONLY a valid JSON object like:
+            {
+              "total": 120.50,
+              "items": ["Milk", "Bread"]
+            }
+        """.trimIndent()
+        
+        try {
+            val request = com.sohan.comparo.network.ChatRequest(
+                messages = listOf(
+                    com.sohan.comparo.network.Message("user", prompt)
+                )
+            )
+            
+            val response = service.getChatCompletion(request)
+            val content = response.choices.firstOrNull()?.message?.content ?: return ParsedData(textNodes, currentTotal)
+            
+            // Basic JSON extraction (naive)
+            val jsonStr = content.substringAfter("{").substringBeforeLast("}")
+            val totalStr = Regex("\"total\"\\s*:\\s*([\\d.]+)").find("{$jsonStr}")?.groupValues?.get(1)
+            
+            val total = totalStr?.toDoubleOrNull() ?: currentTotal
+            
+            return ParsedData(textNodes, total, true)
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "AI Parse Error", e)
+            return ParsedData(textNodes, currentTotal, false) // Fallback
+        }
+    }
 }

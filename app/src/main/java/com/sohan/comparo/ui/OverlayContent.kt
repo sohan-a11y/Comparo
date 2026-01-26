@@ -20,12 +20,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.State
 
 @Composable
-fun OverlayContent(textState: State<String>) {
+fun OverlayContent(
+    textState: State<String>,
+    onCompareClick: () -> Unit
+) {
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xDDFFFFFF)), // Semi-transparent white
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-        modifier = Modifier.width(200.dp)
+        modifier = Modifier.width(220.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
@@ -40,6 +43,16 @@ fun OverlayContent(textState: State<String>) {
                 fontWeight = FontWeight.Bold,
                 color = Color.Black
             )
+            
+            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+            
+            androidx.compose.material3.Button(
+                onClick = onCompareClick,
+                modifier = Modifier.fillMaxWidth().height(36.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+            ) {
+                 Text("Compare Now", fontSize = 12.sp)
+            }
         }
     }
 }
