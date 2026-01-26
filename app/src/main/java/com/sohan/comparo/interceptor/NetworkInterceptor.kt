@@ -21,8 +21,8 @@ class NetworkInterceptor(
         
         // Share OkHttpClient across all instances
         private val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
+            .connectTimeout(15, TimeUnit.SECONDS) // Increased timeout
+            .readTimeout(15, TimeUnit.SECONDS)
             .build()
     }
     
@@ -40,15 +40,21 @@ class NetworkInterceptor(
             else -> null
         }
         
-        if (platform != null && view != null) {
-            // Clone and execute request in background
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    cloneAndExecuteRequest(view, request, platform)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error cloning request for $platform: ${e.message}", e)
+        if (platform != null) {
+            Log.d(TAG, "MATCHED $platform API: $url")
+            if (view != null) {
+                // Clone and execute request in background
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        cloneAndExecuteRequest(view, request, platform)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error cloning request for $platform: ${e.message}", e)
+                    }
                 }
             }
+        } else {
+             // Optional: Log ignored URLs to help debug if we are missing something
+             // Log.v(TAG, "Ignored: $url")
         }
         
         // Return null to let WebView handle the original request
@@ -57,19 +63,18 @@ class NetworkInterceptor(
     
     private fun isSwiggyApi(url: String): Boolean {
         return url.contains("api/instamart/search") ||
-                url.contains("api/v1/search") && url.contains("swiggy.com") ||
+                (url.contains("api/v1/search") && url.contains("swiggy.com")) ||
                 url.contains("swiggy.com/api/instamart")
     }
     
     private fun isZeptoApi(url: String): Boolean {
-        return url.contains("api/v1/search") && url.contains("zepto.com") ||
-                url.contains("zepto.com/api")
+        // Zepto often uses /api/v1/search or /api/v2/search
+        return (url.contains("api/v1/search") || url.contains("api/v2/search")) && url.contains("zepto")
     }
     
     private fun isBlinkitApi(url: String): Boolean {
-        return url.contains("api/v1/search") && (url.contains("blinkit.com") || url.contains("grofers.com")) ||
-                url.contains("blinkit.com/v2/search") ||
-                url.contains("grofers.com/v2/search")
+        return (url.contains("api/v1/search") || url.contains("v2/search")) && 
+               (url.contains("blinkit.com") || url.contains("grofers.com"))
     }
     
     private fun cloneAndExecuteRequest(view: WebView, originalRequest: WebResourceRequest, platform: String) {
@@ -91,6 +96,9 @@ class NetworkInterceptor(
             
             if (cookies.isNotEmpty()) {
                 requestBuilder.addHeader("Cookie", cookies)
+                Log.d(TAG, "Using Cookies for $platform: ${cookies.take(50)}...")
+            } else {
+                Log.w(TAG, "No Cookies found for $platform. Request might fail.")
             }
             
             // Copy other headers from original request
@@ -107,9 +115,14 @@ class NetworkInterceptor(
             if (response.isSuccessful) {
                 val jsonResponse = response.body?.string()
                 if (!jsonResponse.isNullOrEmpty()) {
+                    Log.d(TAG, "Success ($platform): Got ${jsonResponse.length} chars response")
                     // Broadcast JSON to MainActivity
                     onApiResponse(platform, jsonResponse)
+                } else {
+                    Log.w(TAG, "Empty response body from $platform")
                 }
+            } else {
+                Log.e(TAG, "Failed ($platform): Code ${response.code}")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error executing cloned request for $platform: ${e.message}", e)

@@ -12,6 +12,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import android.view.ViewGroup
 import com.sohan.comparo.parser.ProductInfo
 
 enum class Screen {
@@ -29,7 +31,11 @@ fun ComparoApp(
     onSearch: (String) -> Unit,
     platformStates: List<PlatformLoginState>,
     searchResults: List<ProductInfo>,
-    isSearching: Boolean
+    isSearching: Boolean,
+    searchError: String? = null,
+    activeLoginUrl: String? = null,
+    onLoginFinished: () -> Unit = {},
+    onLoginDismissed: () -> Unit = {}
 ) {
     var currentScreen by remember { mutableStateOf(Screen.SETUP) }
     val allLoggedIn = platformStates.all { it.isLoggedIn }
@@ -41,24 +47,109 @@ fun ComparoApp(
         }
     }
     
+    // Handle Back Press when Login is active
+    androidx.activity.compose.BackHandler(enabled = activeLoginUrl != null) {
+        onLoginDismissed()
+    }
+    
     ComparoTheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            when (currentScreen) {
-                Screen.SETUP -> SetupScreen(
-                    platformStates = platformStates,
-                    onPlatformLogin = onPlatformLogin,
-                    onContinue = { currentScreen = Screen.HOME },
-                    canContinue = allLoggedIn
-                )
-                Screen.HOME -> HomeScreen(
-                    onSearch = onSearch,
-                    searchResults = searchResults,
-                    isSearching = isSearching
-                )
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Main Content
+                when (currentScreen) {
+                    Screen.SETUP -> SetupScreen(
+                        platformStates = platformStates,
+                        onPlatformLogin = onPlatformLogin,
+                        onContinue = { currentScreen = Screen.HOME },
+                        canContinue = allLoggedIn
+                    )
+                    Screen.HOME -> HomeScreen(
+                        onSearch = onSearch,
+                        searchResults = searchResults,
+                        isSearching = isSearching,
+                        searchError = searchError
+                    )
+                }
+                
+                // Login Overlay
+                if (activeLoginUrl != null) {
+                    LoginWebViewContainer(
+                        url = activeLoginUrl,
+                        onDone = onLoginFinished,
+                        onDismiss = onLoginDismissed
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+fun LoginWebViewContainer(
+    url: String,
+    onDone: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .zIndex(10f) // Ensure it's on top
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Toolbar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+                
+                Text(
+                    text = "Login",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                Button(onClick = onDone) {
+                    Text("Done")
+                }
+            }
+            
+            // WebView
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { context ->
+                    android.webkit.WebView(context).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            databaseEnabled = true
+                        }
+                        webViewClient = android.webkit.WebViewClient()
+                        loadUrl(url)
+                    }
+                },
+                update = { webView ->
+                    // Avoid reloading on recomposition if URL hasn't changed effectively
+                    if (webView.url != url && webView.originalUrl != url) {
+                        webView.loadUrl(url)
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -144,7 +235,8 @@ fun SetupScreen(
 fun HomeScreen(
     onSearch: (String) -> Unit,
     searchResults: List<ProductInfo>,
-    isSearching: Boolean
+    isSearching: Boolean,
+    searchError: String? = null
 ) {
     var searchQuery by remember { mutableStateOf("") }
     
@@ -206,7 +298,28 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
+        } else if (searchError != null && !isSearching) {
+            // Error State
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "⚠️",
+                        fontSize = 48.sp
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = searchError,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
         } else if (!isSearching) {
+            // Empty / Initial State
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center

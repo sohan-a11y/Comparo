@@ -59,6 +59,18 @@ object PlatformParser {
     
     private fun parseSwiggyItem(item: JSONObject): ProductInfo? {
         return try {
+            // Check stock status if available
+            if (item.has("in_stock")) {
+                val inStock = item.optInt("in_stock") == 1 || item.optBoolean("in_stock")
+                if (!inStock) return null
+            }
+            // Some swiggy APIs use 'inventory' object
+            if (item.has("inventory")) {
+                val inventory = item.getJSONObject("inventory")
+                val inStock = inventory.optBoolean("in_stock", true)
+                if (!inStock) return null
+            }
+
             val name = item.optString("display_name", item.optString("name", ""))
             if (name.isEmpty()) return null
             

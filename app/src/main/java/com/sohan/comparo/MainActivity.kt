@@ -22,15 +22,18 @@ class MainActivity : ComponentActivity() {
     
     companion object {
         private const val TAG = "Comparo"
-        private const val SEARCH_TIMEOUT_MS = 5000L
+        private const val SEARCH_TIMEOUT_MS = 6000L
     }
     
+    // Headless WebViews
     private lateinit var swiggyWebView: WebView
     private lateinit var zeptoWebView: WebView
     private lateinit var blinkitWebView: WebView
     
-    private var loginDialogWebView: WebView? = null
+    // Hidden container for Headless WebViews
+    private lateinit var hiddenWebViewContainer: android.widget.LinearLayout
     
+    // State
     private val platformStates = mutableStateListOf(
         PlatformLoginState("Swiggy", false),
         PlatformLoginState("Zepto", false),
@@ -39,90 +42,116 @@ class MainActivity : ComponentActivity() {
     
     private val searchResults = mutableStateListOf<ProductInfo>()
     private var isSearching = mutableStateOf(false)
+    private var searchError = mutableStateOf<String?>(null)
+    
+    // Active Login URL (null means no login screen is visible)
+    private var activeLoginUrl = mutableStateOf<String?>(null)
+    private var activeLoginPlatform = mutableStateOf<String?>(null)
     
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Enable WebView debugging only in debug builds
         if (BuildConfig.DEBUG) {
             WebView.setWebContentsDebuggingEnabled(true)
         }
         
-        // Initialize cookie manager
-        val cookieManager = CookieManager.getInstance()
-        cookieManager.setAcceptCookie(true)
+        // Initialize root layout to hold both Compose and Hidden WebViews
+        val rootLayout = android.widget.FrameLayout(this)
+        rootLayout.layoutParams = ViewGroup.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        )
         
-        // Create headless WebViews
+        // 1. Create hidden container for Headless WebViews
+        // Crucial: Must be visible (not GONE) but 1x1 pixel to ensure Android prioritizes execution
+        hiddenWebViewContainer = android.widget.LinearLayout(this).apply {
+            layoutParams = ViewGroup.LayoutParams(1, 1)
+            orientation = android.widget.LinearLayout.VERTICAL
+            visibility = android.view.View.VISIBLE 
+            alpha = 0.01f // Almost invisible
+        }
+        rootLayout.addView(hiddenWebViewContainer)
+        
+        // 2. Initialize and attach WebViews
         initializeHeadlessWebViews()
         
-        setContent {
-            val scope = rememberCoroutineScope()
-            
-            ComparoApp(
-                onPlatformLogin = { platform ->
-                    scope.launch {
-                        openLoginDialog(platform)
+        // 3. Set Content using ComposeView
+        val composeView = androidx.compose.ui.platform.ComposeView(this).apply {
+            setContent {
+                val scope = rememberCoroutineScope()
+                
+                ComparoApp(
+                    onPlatformLogin = { platform ->
+                        startLogin(platform)
+                    },
+                    onSearch = { query ->
+                        scope.launch {
+                            searchError.value = null // Clear previous error
+                            performSearch(query)
+                        }
+                    },
+                    platformStates = platformStates.toList(),
+                    searchResults = searchResults.toList(),
+                    isSearching = isSearching.value,
+                    searchError = searchError.value,
+                    activeLoginUrl = activeLoginUrl.value,
+                    onLoginFinished = {
+                        finishLogin()
+                    },
+                    onLoginDismissed = {
+                         activeLoginUrl.value = null
+                         activeLoginPlatform.value = null
                     }
-                },
-                onSearch = { query ->
-                    scope.launch {
-                        performSearch(query)
-                    }
-                },
-                platformStates = platformStates.toList(),
-                searchResults = searchResults.toList(),
-                isSearching = isSearching.value
-            )
+                )
+            }
         }
+        rootLayout.addView(composeView)
+        
+        setContentView(rootLayout)
     }
     
     @SuppressLint("SetJavaScriptEnabled")
     private fun initializeHeadlessWebViews() {
-        // Swiggy WebView
-        swiggyWebView = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(0, 0)  // Headless
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
+        // Helper to create and attach a WebView
+        fun createAttachedWebView(): WebView {
+            val webView = WebView(this).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                settings.apply {
+                    javaScriptEnabled = true
+                    domStorageEnabled = true
+                    databaseEnabled = true
+                    cacheMode = WebSettings.LOAD_DEFAULT
+                    // Crucial for headless operation
+                    loadsImagesAutomatically = false
+                    blockNetworkImage = true
+                }
             }
-            webViewClient = NetworkInterceptor { platform, jsonResponse ->
-                handleApiResponse(platform, jsonResponse)
-            }
+            hiddenWebViewContainer.addView(webView)
+            return webView
         }
         
-        // Zepto WebView
-        zeptoWebView = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(0, 0)  // Headless
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
-            }
-            webViewClient = NetworkInterceptor { platform, jsonResponse ->
-                handleApiResponse(platform, jsonResponse)
-            }
+        swiggyWebView = createAttachedWebView()
+        swiggyWebView.webViewClient = NetworkInterceptor { platform, jsonResponse ->
+            handleApiResponse(platform, jsonResponse)
         }
         
-        // Blinkit WebView
-        blinkitWebView = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(0, 0)  // Headless
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-                cacheMode = WebSettings.LOAD_DEFAULT
-            }
-            webViewClient = NetworkInterceptor { platform, jsonResponse ->
-                handleApiResponse(platform, jsonResponse)
-            }
+        zeptoWebView = createAttachedWebView()
+        zeptoWebView.webViewClient = NetworkInterceptor { platform, jsonResponse ->
+            handleApiResponse(platform, jsonResponse)
+        }
+        
+        blinkitWebView = createAttachedWebView()
+        blinkitWebView.webViewClient = NetworkInterceptor { platform, jsonResponse ->
+            handleApiResponse(platform, jsonResponse)
         }
         
         // Enable third-party cookies
         val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
         cookieManager.setAcceptThirdPartyCookies(swiggyWebView, true)
         cookieManager.setAcceptThirdPartyCookies(zeptoWebView, true)
         cookieManager.setAcceptThirdPartyCookies(blinkitWebView, true)
@@ -137,12 +166,12 @@ class MainActivity : ComponentActivity() {
         }
         
         runOnUiThread {
+            // Add new results
             searchResults.addAll(products)
         }
     }
     
-    @SuppressLint("SetJavaScriptEnabled")
-    private fun openLoginDialog(platform: String) {
+    private fun startLogin(platform: String) {
         val url = when (platform) {
             "Swiggy" -> "https://www.swiggy.com/instamart"
             "Zepto" -> "https://www.zepto.com"
@@ -150,42 +179,25 @@ class MainActivity : ComponentActivity() {
             else -> return
         }
         
-        // Create a dialog with WebView for login
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle("Login to $platform")
-            .create()
+        activeLoginPlatform.value = platform
+        activeLoginUrl.value = url
+    }
+    
+    private fun finishLogin() {
+        val platform = activeLoginPlatform.value ?: return
         
-        val webView = WebView(this).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            settings.apply {
-                javaScriptEnabled = true
-                domStorageEnabled = true
-                databaseEnabled = true
-            }
+        // Save login state
+        val index = platformStates.indexOfFirst { it.name == platform }
+        if (index >= 0) {
+            platformStates[index] = platformStates[index].copy(isLoggedIn = true)
         }
         
-        dialog.setView(webView)
-        dialog.setButton(android.app.AlertDialog.BUTTON_POSITIVE, "Done") { _, _ ->
-            // Save login state
-            val index = platformStates.indexOfFirst { it.name == platform }
-            if (index >= 0) {
-                platformStates[index] = platformStates[index].copy(isLoggedIn = true)
-            }
-            
-            // Save cookies
-            CookieManager.getInstance().flush()
-        }
-        dialog.setButton(android.app.AlertDialog.BUTTON_NEGATIVE, "Cancel") { _, _ ->
-            dialog.dismiss()
-        }
+        // Persist cookies
+        CookieManager.getInstance().flush()
         
-        webView.loadUrl(url)
-        dialog.show()
-        
-        loginDialogWebView = webView
+        // Close overlay
+        activeLoginUrl.value = null
+        activeLoginPlatform.value = null
     }
     
     private suspend fun performSearch(query: String) {
@@ -196,6 +208,8 @@ class MainActivity : ComponentActivity() {
         
         // Load search URLs in all three WebViews simultaneously
         val encodedQuery = java.net.URLEncoder.encode(query, java.nio.charset.StandardCharsets.UTF_8.toString())
+        
+        Log.d(TAG, "Starting search for: $query")
         
         // Swiggy search
         swiggyWebView.loadUrl("https://www.swiggy.com/instamart/search?q=$encodedQuery")
@@ -210,13 +224,19 @@ class MainActivity : ComponentActivity() {
         delay(SEARCH_TIMEOUT_MS)
         
         isSearching.value = false
+        
+        if (searchResults.isEmpty()) {
+            Log.w(TAG, "Search completed with NO results.")
+            searchError.value = "No products found. Please check if you are logged in to the platforms."
+        }
     }
     
     override fun onDestroy() {
         super.onDestroy()
+        // Cleanup to prevent memory leaks
+        hiddenWebViewContainer.removeAllViews()
         swiggyWebView.destroy()
         zeptoWebView.destroy()
         blinkitWebView.destroy()
-        loginDialogWebView?.destroy()
     }
 }
