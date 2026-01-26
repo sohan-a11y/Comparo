@@ -19,6 +19,7 @@ import com.sohan.comparo.parser.BankOffer
 import com.sohan.comparo.parser.PlatformParser
 import com.sohan.comparo.parser.ProductInfo
 
+
 enum class Screen {
     SETUP, HOME
 }
