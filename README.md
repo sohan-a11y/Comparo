@@ -1,5 +1,12 @@
 # Comparo - Android Price Comparison App
 
+![GitHub License](https://img.shields.io/github/license/sohan-a11y/Comparo?style=flat-square)
+![GitHub Last Commit](https://img.shields.io/github/last-commit/sohan-a11y/Comparo?style=flat-square)
+![GitHub Stars](https://img.shields.io/github/stars/sohan-a11y/Comparo?style=flat-square)
+
+[![Skills](https://skillicons.dev/icons?i=python,fastapi,streamlit)](https://skillicons.dev)
+
+
 A complete Android application that compares grocery prices across Swiggy Instamart, Zepto, and Blinkit using headless WebViews to intercept API calls.
 
 ## Download
@@ -152,3 +159,14 @@ app/src/main/
 ## License
 
 This is a demonstration project for educational purposes.
+
+
+---
+
+<div align="center">
+
+**Built by [M Sai Sohan (@sohan-a11y)](https://github.com/sohan-a11y)**
+
+*If you find this project useful, please consider giving it a ⭐ on GitHub!*
+
+</div>
